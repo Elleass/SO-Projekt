@@ -12,5 +12,6 @@ typedef struct {
 } Bee;
 
 Bee* createBee(int id, int time_in_hive, int visits_left);
+void* bee_life(void* arg);
 
 #endif
