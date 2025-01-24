@@ -11,6 +11,11 @@ typedef struct {
     int visits_left;
 } Bee;
 
+typedef struct {
+    int id;
+    int hatch_time;
+} Egg;
+ 
 Bee* createBee(int id, int time_in_hive, int visits_left);
 void* bee_life(void* arg);
 
