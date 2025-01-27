@@ -64,8 +64,6 @@ void hive_state(sem_t *ul_wejscie, int max_capacity) {
     if (sem_getvalue(ul_wejscie, &value) == 0) {
         if (value < 0) {
             printf("Ul jest pełny, liczba czekających pszczół %d\n", -value);
-        } else if (value > max_capacity) {
-            printf("Error: Semaphore value exceeds max capacity! Current value: %d\n", value);
         } else {
             int taken_spaces = max_capacity - value;
             printf("Przestrzeń zajęta: %d\n", taken_spaces);
@@ -73,5 +71,21 @@ void hive_state(sem_t *ul_wejscie, int max_capacity) {
         }
     } else {
         perror("sem_getvalue failed"); // Error in retrieving semaphore value
+    }
+}
+void adjust_hive_capacity(int new_capacity) {
+    int current_value;
+    sem_getvalue(ul_wejscie, &current_value);
+
+    if (new_capacity > current_value) {
+        printf("Dodawanie ramek: zwiększanie pojemności ula do %d\n", new_capacity);
+        for (int i = 0; i < (new_capacity - current_value); i++) {
+            sem_post(ul_wejscie);
+        }
+    } else if (new_capacity < current_value) {
+        printf("Usuwanie ramek: zmniejszanie pojemności ula do %d\n", new_capacity);
+        for (int i = 0; i < (current_value - new_capacity); i++) {
+            sem_wait(ul_wejscie);
+        }
     }
 }

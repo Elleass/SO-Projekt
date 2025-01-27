@@ -10,6 +10,8 @@
 #include "bee.h"
 #include "queen.h"
 #include "egg.h"
+#include "beekeper.h"
+#include "interface.h"
 
 // Define the global capacity here (exactly once)
 int capacity = 0;
@@ -166,12 +168,21 @@ printf("Semaphore value after initialization: %d\n", sem_value);
         exit(EXIT_FAILURE);
     }
 
-    // Main process loop
-    while (!stop) {
-        sleep(1);
-    }
+    pthread_t beekeeper_thread;
+if (pthread_create(&beekeeper_thread, NULL, beekeeper, NULL) != 0) {
+    perror("Błąd: Nie udało się utworzyć wątku pszczelarza.");
+    exit(EXIT_FAILURE);
+}
 
-    // 1. Join the starter bee threads
+
+    log_event("Rozpoczęcie programu.");
+
+    // Uruchomienie głównego interfejsu
+    show_main_menu();
+
+
+
+
     for (int i = 0; i < num_starter_bees; i++) {
         pthread_join(starter_bees[i], NULL);
     }
