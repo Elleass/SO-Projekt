@@ -26,13 +26,15 @@ void* bee_life(void* arg) {
     while (bee->visits_left > 0) {
         //proba wejscia do ula
         hive_entry(bee->id);
+        hive_state(ul_wejscie, capacity);
         // symulacja bycia w ulu
         sleep(bee->time_in_hive);
         //proba wyjscia z ula
         hive_leave(bee->id);
+        hive_state(ul_wejscie, capacity);
         bee->visits_left--;
         // symulacja czasu poza ulem
-        sleep(1);
+        sleep(5);
     }
 
     printf("Pszczoła %d kończy życie.\n", bee->id);
