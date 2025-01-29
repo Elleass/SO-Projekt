@@ -13,7 +13,6 @@
 #include <signal.h>
 #include <sys/wait.h> // Dodano nagłówek
 #include <semaphore.h>
-extern int next_bee_id;
 extern volatile sig_atomic_t stop;
 void queen_process(EggQueue* eggQueue);
 void hatch_eggs(EggQueue* eggQueue);

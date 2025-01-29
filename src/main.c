@@ -15,6 +15,7 @@
 
 // Define the global capacity here (exactly once)
 int capacity = 0;
+int next_bee_id;
 
 // Global semaphores
 sem_t *ul_wejscie;
@@ -25,71 +26,113 @@ sem_t wejscie2_kierunek;
 volatile sig_atomic_t stop = 0;
 
 // Track initial bees
-pthread_t starter_bees[1000];
-int num_starter_bees = 0;
-int next_bee_id = 0;
+pthread_t starter_bees;
+pthread_t beekeeper_thread;
+
+
 
 EggQueue *eggQueue = NULL;
 // PIDs for queen and hatch processes
 pid_t queen_pid = -1;
 pid_t hatch_pid = -1;
 
-// --------------------------------------------------------------------
 
-/********************************************
- * Cleanup routines
- ********************************************/
-void cleanup_processes() {
-    // Kill queen if alive
+// 4) Cleanup
+/************************************************
+ * Cleanup function to gracefully stop the program
+ ************************************************/
+void cleanup() {
+    printf("Starting cleanup...\n");
+
+    // Terminate queen process
     if (queen_pid > 0) {
+        printf("Terminating queen process (PID: %d)...\n", queen_pid);
         kill(queen_pid, SIGTERM);
         waitpid(queen_pid, NULL, 0);
         printf("Queen process terminated.\n");
     }
-    // Kill hatch if alive
+
+    // Terminate hatch process
     if (hatch_pid > 0) {
+        printf("Terminating hatch process (PID: %d)...\n", hatch_pid);
         kill(hatch_pid, SIGTERM);
         waitpid(hatch_pid, NULL, 0);
         printf("Hatch process terminated.\n");
     }
-}
 
-void cleanup() {
-    // Terminate child processes
-    cleanup_processes();
+    // Cancel beekeeper thread
+    if (beekeeper_thread) {
+        printf("Canceling beekeeper thread...\n");
+        pthread_cancel(beekeeper_thread);
+        pthread_join(beekeeper_thread, NULL);
+        printf("Beekeeper thread terminated.\n");
+    }
+
+    // Cancel and join all bee threads
+    pthread_mutex_lock(&bee_list_mutex);
+    printf("Canceling %d bee threads...\n", bee_thread_count);
+    for (int i = 0; i < bee_thread_count; i++) {
+        pthread_cancel(bee_threads[i]);
+    }
+    for (int i = 0; i < bee_thread_count; i++) {
+        pthread_join(bee_threads[i], NULL);
+    }
+    free(bee_threads);
+    bee_threads = NULL;
+    bee_thread_capacity = 0;
+    bee_thread_count = 0;
+    pthread_mutex_unlock(&bee_list_mutex);
+    printf("Bee threads cleaned up.\n");
 
     // Destroy semaphores
-    if (ul_wejscie) {
-        sem_destroy(ul_wejscie);  // unnamed semaphore stored in shared memory
-        munmap(ul_wejscie, sizeof(sem_t));
-        ul_wejscie = NULL;
-    }
+    printf("Destroying semaphores...\n");
     sem_destroy(&wejscie1_kierunek);
     sem_destroy(&wejscie2_kierunek);
+    if (ul_wejscie != MAP_FAILED) {
+        sem_destroy(ul_wejscie);
+        munmap(ul_wejscie, sizeof(sem_t));
+    }
+    printf("Semaphores destroyed.\n");
 
     // Destroy egg queue
-    destroySharedEggQueue();
+    if (eggQueue) {
+        printf("Destroying egg queue...\n");
+        destroySharedEggQueue(eggQueue); // Assuming destroySharedEggQueue() exists
+        eggQueue = NULL;
+        printf("Egg queue destroyed.\n");
+    }
 
-    printf("Resources cleaned up. Program exiting.\n");
+    printf("Cleanup completed. Exiting.\n");
 }
+
+
 
 /********************************************
  * Signal handler for SIGINT
  ********************************************/
 void handle_sigint(int sig) {
-    (void)sig;
-    stop = 1;
-    printf("\nSIGINT received. Stopping...\n");
-    // Once main sees stop == 1, it calls cleanup() then exits,
-    // thus terminating all threads and child processes immediately.
-}
+    (void)sig; // Unused parameter
+    static int already_handled = 0; // Ensure only the first signal is processed
 
+    if (__sync_lock_test_and_set(&already_handled, 1) == 0) { // Atomic check-and-set
+        stop = 1;
+        printf("\nSIGINT received. Stopping...\n");
+    }
+}
 /********************************************
  * MAIN
  ********************************************/
 int main() {
     // Register SIGINT handler
-    signal(SIGINT, handle_sigint);
+    struct sigaction sa;
+sa.sa_handler = handle_sigint;
+sigemptyset(&sa.sa_mask);
+sa.sa_flags = 0;
+
+if (sigaction(SIGINT, &sa, NULL) == -1) {
+    perror("Error setting up SIGINT handler");
+    exit(EXIT_FAILURE);
+}
 
     // Prompt user for capacity
     printf("Podaj maksymalną liczbę pszczół w ulu: ");
@@ -110,14 +153,14 @@ int main() {
     }
     int num_starter_bees = start_bees;
 
-    // Initialize shared EggQueue
+    // Initialize shared EggQueue (including occupant_count)
     Error err = initSharedEggQueue(&eggQueue);
     if (err.code != ERR_SUCCESS) {
         handle_error(err);
         exit(EXIT_FAILURE);
     }
 
-    // Allocate shared memory for ul_wejscie (the main hive semaphore)
+    // Allocate shared memory for ul_wejscie (the main hive semaphore for blocking)
     ul_wejscie = mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE,
                       MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     if (ul_wejscie == MAP_FAILED) {
@@ -137,26 +180,28 @@ int main() {
     sem_init(&wejscie2_kierunek, 0, 1);
 
     // Create initial bees
-    pthread_t starter_bees_threads[1000];
     for (int i = 0; i < num_starter_bees; i++) {
-        Bee* b = createBee(next_bee_id++, 4, 3);
-        if (!b) {
-            fprintf(stderr, "Error: Bee creation failed for index %d.\n", i);
-            continue;
-        }
-        if (pthread_create(&starter_bees_threads[i], NULL, bee_life, b) != 0) {
-            fprintf(stderr, "Error: Failed to create thread for Bee ID %d.\n", b->id);
-            free(b);
-            continue;
-        }
+    Bee* b = createBee(next_bee_id++, 4, 3);
+    if (!b) {
+        fprintf(stderr, "Error: Bee creation failed for index %d.\n", i);
+        continue;
     }
+
+    create_a_bee(b); // Use the helper function to create and register the bee
+}
 
     // Create queen process
     queen_pid = fork();
-    if (queen_pid == 0) {
-        // Child: queen process
-        queen_process(eggQueue);
-        _exit(0); // never reached unless error
+   if (queen_pid == 0) {
+    // Child: Queen
+    struct sigaction ignore_sa;
+    ignore_sa.sa_handler = SIG_IGN;
+    sigemptyset(&ignore_sa.sa_mask);
+    ignore_sa.sa_flags = 0;
+    sigaction(SIGINT, &ignore_sa, NULL);
+
+    queen_process(eggQueue);
+    _exit(0);
     } else if (queen_pid < 0) {
         perror("Failed to create queen process");
         cleanup();
@@ -166,14 +211,21 @@ int main() {
     // Create hatch process
     hatch_pid = fork();
     if (hatch_pid == 0) {
-        // Child: hatch process
-        hatch_eggs(eggQueue);
-        _exit(0); // never reached unless error
-    } else if (hatch_pid < 0) {
+    struct sigaction ignore_sa;
+    ignore_sa.sa_handler = SIG_IGN;
+    sigemptyset(&ignore_sa.sa_mask);
+    ignore_sa.sa_flags = 0;
+    sigaction(SIGINT, &ignore_sa, NULL);
+
+    hatch_eggs(eggQueue);
+    _exit(0);
+} else if (hatch_pid < 0) {
         perror("Failed to create hatch process");
         cleanup();
         exit(EXIT_FAILURE);
     }
+
+    
 
     // Create beekeeper thread
     pthread_t beekeeper_thread;
@@ -183,23 +235,15 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    // Join the starter bees so main won't exit prematurely
-    for (int i = 0; i < num_starter_bees; i++) {
-        pthread_join(starter_bees_threads[i], NULL);
-    }
-
     // We'll *not* join the beekeeper thread so the program remains interactive
-    // and doesn't exit until we get Ctrl+C. The queen & hatch processes also run.
+    // (for signals 4,5). Similarly, queen/hatch processes run until Ctrl+C.
 
     printf("Program is running. Press CTRL+C to stop.\n");
-    // Wait until user presses Ctrl+C => handle_sigint sets stop=1
     while (!stop) {
         sleep(1);
     }
 
-    // Once stop=1, we proceed to cleanup:
+    // final cleanup
     cleanup();
-
-    // Exiting main kills any leftover threads automatically.
     return 0;
 }

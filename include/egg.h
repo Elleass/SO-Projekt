@@ -10,6 +10,9 @@
 
 #define MAX_EGGS 100
 
+
+
+
 typedef struct Egg {
     int id;
     int hatch_time;
@@ -20,8 +23,10 @@ typedef struct EggQueue {
     int front;
     int rear;
     int size;
+    int occupant_count; 
 } EggQueue;
 
+extern EggQueue *eggQueue;
 // Shared memory and semaphore management
 Error initSharedEggQueue(EggQueue** queue);
 void destroySharedEggQueue();
@@ -29,5 +34,10 @@ void destroySharedEggQueue();
 // Queue operations
 int enqueueEgg(EggQueue* queue, Egg egg);
 int dequeueEgg(EggQueue* queue, Egg* egg);
+void occupant_increment(void);
+ void occupant_decrement(void);
+
+ void lock_queue(void);
+void unlock_queue(void);
 
 #endif

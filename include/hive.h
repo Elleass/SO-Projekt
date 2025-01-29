@@ -14,7 +14,7 @@ extern EggQueue *eggQueue;
 
 void hive_leave(int id);
 void hive_entry(int id);
-void hive_state(sem_t *ul_wejscie, int max_capacity);
+void hive_state(void);
 void adjust_hive_capacity(int new_capacity);
 
 #endif
