@@ -1,16 +1,15 @@
 
-#include "../include/bee.h"
-#include "../include/hive.h"
-
-#include <unistd.h> // Dodano dla funkcji sleep
-
+#include "bee.h"
+#include "hive.h"
+#include "error_handling.h"
 
 
-Bee* createBee(int id, int time_in_hive, int visits_left){
+
+Bee* createBee(int id, int time_in_hive, int visits_left) {
     Bee* new_bee = (Bee*)malloc(sizeof(Bee));
     if (!new_bee) {
-        perror("Nie udało się przydzielić pamięci dla pszczoły");
-        exit(EXIT_FAILURE);
+        handle_error((Error){ERR_MEMORY_ALLOC, "Failed to allocate memory for Bee"});
+        return NULL;
     }
     new_bee->id = id;
     new_bee->time_in_hive = time_in_hive;
@@ -20,24 +19,33 @@ Bee* createBee(int id, int time_in_hive, int visits_left){
 
 void* bee_life(void* arg) {
     Bee* bee = (Bee*)arg;
+    if (!bee) {
+        fprintf(stderr, "Invalid Bee pointer\n");
+        return NULL;
+    }
 
-    printf("Pszczoła %d startuje w wątku.\n", bee->id);
+    printf("\033[0;32mPszczoła %d startuje w wątku.\033[0m\n", bee->id);
 
-    while (bee->visits_left > 0) {
-        //proba wejscia do ula
+    while (bee->visits_left > 0 && !stop) {
+        // Attempt to enter hive
         hive_entry(bee->id);
         hive_state(ul_wejscie, capacity);
-        // symulacja bycia w ulu
+        // Simulate time in hive
         sleep(bee->time_in_hive);
-        //proba wyjscia z ula
+        // Attempt to leave hive
         hive_leave(bee->id);
         hive_state(ul_wejscie, capacity);
         bee->visits_left--;
-        // symulacja czasu poza ulem
+        // Simulate outside hive time
         sleep(5);
     }
 
-    printf("Pszczoła %d kończy życie.\n", bee->id);
+    printf("\033[0;32mPszczoła %d kończy życie.\033[0m\n", bee->id);
+
+    // Unlock direction semaphores as a fallback
+    sem_post(&wejscie1_kierunek);
+    sem_post(&wejscie2_kierunek);
+
     free(bee);
     return NULL;
 }

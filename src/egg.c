@@ -1,4 +1,5 @@
 #include "egg.h"
+#include "error_handling.h"
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/sem.h>
@@ -9,63 +10,63 @@
 int shm_id = -1;
 int sem_id = -1;
 
-EggQueue* initSharedEggQueue() {
-    // Create shared memory segment
+// Error structure is from error_handling.
+
+Error initSharedEggQueue(EggQueue **queue) {
     shm_id = shmget(IPC_PRIVATE, sizeof(EggQueue), IPC_CREAT | 0666);
     if (shm_id == -1) {
-        perror("Failed to create shared memory");
-        exit(EXIT_FAILURE);
+        return (Error){ERR_MEMORY_ALLOC, "Failed to create shared memory"};
     }
 
-    // Attach to shared memory
-    EggQueue* queue = (EggQueue*)shmat(shm_id, NULL, 0);
-    if (queue == (void*)-1) {
-        perror("Failed to attach shared memory");
-        exit(EXIT_FAILURE);
+    *queue = (EggQueue*) shmat(shm_id, NULL, 0);
+    if (*queue == (void*)-1) {
+        return (Error){ERR_MEMORY_ALLOC, "Failed to attach shared memory"};
     }
 
-    // Initialize queue in shared memory
-    queue->front = 0;
-    queue->rear = -1;
-    queue->size = 0;
+    (*queue)->front = 0;
+    (*queue)->rear = -1;
+    (*queue)->size = 0;
 
-    // Initialize semaphores
+    // Create a System V semaphore for queue concurrency
     sem_id = semget(IPC_PRIVATE, 1, IPC_CREAT | 0666);
     if (sem_id == -1) {
-        perror("Failed to create semaphore");
-        exit(EXIT_FAILURE);
+        return (Error){ERR_MEMORY_ALLOC, "Failed to create System V semaphore"};
     }
-    semctl(sem_id, 0, SETVAL, 1); // Set initial semaphore value
 
-    return queue;
+    // Initialize the semaphore value to 1 (binary semaphore)
+    if (semctl(sem_id, 0, SETVAL, 1) == -1) {
+        return (Error){ERR_MEMORY_ALLOC, "Failed to set semaphore value"};
+    }
+
+    return (Error){ERR_SUCCESS, "EggQueue initialized successfully"};
 }
 
 void destroySharedEggQueue() {
-    // Detach shared memory
+    // Detach/remove shared memory
     if (shm_id != -1) {
         if (shmctl(shm_id, IPC_RMID, NULL) == -1) {
             perror("Failed to remove shared memory");
         }
     }
 
-    // Remove semaphore
+    // Remove the semaphore
     if (sem_id != -1) {
         if (semctl(sem_id, 0, IPC_RMID) == -1) {
-            perror("Failed to remove semaphore");
+            perror("Failed to remove System V semaphore");
         }
     }
 }
 
 int enqueueEgg(EggQueue* q, Egg egg) {
-    // Lock semaphore
+    // Acquire lock
     struct sembuf lock_op = {0, -1, 0};
     if (semop(sem_id, &lock_op, 1) == -1) {
-        perror("Failed to lock semaphore");
+        perror("enqueueEgg: Failed to lock semaphore");
         return -1;
     }
 
     if (q->size == MAX_EGGS) {
-        // Queue is full
+        // Release lock
         struct sembuf unlock_op = {0, 1, 0};
         semop(sem_id, &unlock_op, 1);
         return -1;
@@ -75,23 +76,23 @@ int enqueueEgg(EggQueue* q, Egg egg) {
     q->eggs[q->rear] = egg;
     q->size++;
 
-    // Unlock semaphore
+    // Release lock
     struct sembuf unlock_op = {0, 1, 0};
     semop(sem_id, &unlock_op, 1);
 
-    return 0; // Success
+    return 0; // success
 }
 
 int dequeueEgg(EggQueue* q, Egg* egg) {
-    // Lock semaphore
+    // Acquire lock
     struct sembuf lock_op = {0, -1, 0};
     if (semop(sem_id, &lock_op, 1) == -1) {
-        perror("Failed to lock semaphore");
+        perror("dequeueEgg: Failed to lock semaphore");
         return -1;
     }
 
     if (q->size == 0) {
-        // Queue is empty
+        // Release
         struct sembuf unlock_op = {0, 1, 0};
         semop(sem_id, &unlock_op, 1);
         return -1;
@@ -101,9 +102,9 @@ int dequeueEgg(EggQueue* q, Egg* egg) {
     q->front = (q->front + 1) % MAX_EGGS;
     q->size--;
 
-    // Unlock semaphore
+    // Release lock
     struct sembuf unlock_op = {0, 1, 0};
     semop(sem_id, &unlock_op, 1);
 
-    return 0; // Success
+    return 0; // success
 }

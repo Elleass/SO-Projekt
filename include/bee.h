@@ -4,6 +4,8 @@ extern int capacity;
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
 
 typedef struct {
     int id;

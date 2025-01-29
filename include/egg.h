@@ -6,6 +6,7 @@
 #include <sys/sem.h>
 #include <pthread.h>
 #include <unistd.h>
+#include "error_handling.h"  // Include for Error type
 
 #define MAX_EGGS 100
 
@@ -22,7 +23,7 @@ typedef struct EggQueue {
 } EggQueue;
 
 // Shared memory and semaphore management
-EggQueue* initSharedEggQueue();
+Error initSharedEggQueue(EggQueue** queue);
 void destroySharedEggQueue();
 
 // Queue operations

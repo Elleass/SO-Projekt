@@ -1,7 +1,8 @@
 {
     "files.associations": {
         "hive.h": "c",
-        "queen.h": "c"
+        "queen.h": "c",
+        "error_handling.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
