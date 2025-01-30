@@ -2,6 +2,8 @@
 #include "bee.h"
 #include "hive.h"
 #include "error_handling.h"
+#include "cleanup.h"
+#include "errno.h"
 
 pthread_t *bee_threads = NULL;
 int bee_thread_count = 0;
@@ -25,20 +27,36 @@ Bee* createBee(int id, int time_in_hive, int visits_left) {
 void create_a_bee(Bee* b) {
     pthread_t t;
     int rc = pthread_create(&t, NULL, bee_life, b);
+    static int consecutive_failures = 0; // Track consecutive failures
+
     if (rc != 0) {
         fprintf(stderr, "Failed to create bee thread (errno=%d)\n", rc);
         free(b);
-        stop = 1; // gracefully signal to stop
-        return;
+
+        if (rc == EAGAIN) { // EAGAIN indicates resource exhaustion (errno=11)
+            consecutive_failures++;
+            if (consecutive_failures >= 3) { // Trigger stop after 3 consecutive failures
+                fprintf(stderr, "Repeated thread creation failures. Stopping program.\n");
+                stop = 1; // Set stop flag for graceful termination
+                cleanup(); // Call cleanup and terminate
+                exit(EXIT_FAILURE); // Ensure the program exits
+            }
+        }
+        return; // Allow the program to continue for other types of errors
     }
+
+    consecutive_failures = 0; // Reset failure counter on successful creation
+
     if (register_bee_thread(t) < 0) {
         fprintf(stderr, "Out of memory storing bee thread.\n");
         pthread_cancel(t);
         free(b);
-        stop = 1;
-        return;
+        stop = 1; // gracefully signal to stop
+        cleanup();
+        exit(EXIT_FAILURE);
     }
 }
+
 
  int register_bee_thread(pthread_t thread) {
     pthread_mutex_lock(&bee_list_mutex);

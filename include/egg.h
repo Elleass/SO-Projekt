@@ -24,6 +24,7 @@ typedef struct EggQueue {
     int rear;
     int size;
     int occupant_count; 
+    
 } EggQueue;
 
 extern EggQueue *eggQueue;

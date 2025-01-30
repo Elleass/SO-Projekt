@@ -16,6 +16,7 @@
 // Define the global capacity here (exactly once)
 int capacity = 0;
 int next_bee_id;
+int N;
 
 // Global semaphores
 sem_t *ul_wejscie;
@@ -135,23 +136,25 @@ if (sigaction(SIGINT, &sa, NULL) == -1) {
 }
 
     // Prompt user for capacity
-    printf("Podaj maksymalną liczbę pszczół w ulu: ");
-    if (scanf("%d", &capacity) != 1 || capacity <= 0) {
-        fprintf(stderr, "Błąd: Wprowadzono niepoprawne dane. Oczekiwano liczby całkowitej > 0.\n");
+
+    printf("Podaj calkowitą liczbę pszczol w roju (N) :  ");
+    if (scanf("%d", &N) != 1 || N <= 0) {
+        fprintf(stderr, "Błąd: Wprowadzono niepoprawne dane. Oczekiwano liczby całkowitej!! > 0.\n");
         exit(EXIT_FAILURE);
     }
-    printf("Maksymalna liczba pszczół w ulu: %d\n", capacity);
+    
+
 
     // Prompt user for starting number of bees
-    int start_bees = 0;
-    printf("Podaj startową liczbę pszczół (maksymalnie %d): ", capacity / 2);
-    if (scanf("%d", &start_bees) != 1 || start_bees <= 0 || start_bees > capacity / 2) {
-        fprintf(stderr,
-                "Błąd: Wprowadzono niepoprawne dane. Musi być 1-%d.\n",
-                capacity / 2);
+       int  P;
+    printf("Podaj maksymalną liczbę pszczol w roju (P), gdzie (P) < N/2: ");
+    if (scanf("%d", &P) != 1 || P <= 0 || P >= N/2) {
+        fprintf(stderr, "Błąd: Wprowadzono niepoprawne dane. P musi być dodatnie i < N/2!!.\n");
         exit(EXIT_FAILURE);
     }
-    int num_starter_bees = start_bees;
+    capacity = P;
+        printf("Maksymalna liczba pszczół w ulu: %d\n", capacity);
+    int num_starter_bees = N;
 
     // Initialize shared EggQueue (including occupant_count)
     Error err = initSharedEggQueue(&eggQueue);
