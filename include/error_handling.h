@@ -16,6 +16,7 @@ typedef struct {
     const char *message;
 } Error;
 
+// Prosta funkcja wypisująca błąd na stderr
 void handle_error(Error err);
 
 #endif // ERROR_HANDLING_H

@@ -1,15 +1,14 @@
-
 #include "bee.h"
 #include "hive.h"
 #include "error_handling.h"
 #include "cleanup.h"
 #include "errno.h"
 
-pthread_t *bee_threads = NULL;
-int bee_thread_count = 0;
-int bee_thread_capacity = 0;
-
-pthread_mutex_t bee_list_mutex = PTHREAD_MUTEX_INITIALIZER;
+// (przeniesione do main.c)
+// pthread_t *bee_threads = NULL;
+// int bee_thread_count = 0;
+// int bee_thread_capacity = 0;
+// pthread_mutex_t bee_list_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 Bee* createBee(int id, int time_in_hive, int visits_left) {
     Bee* new_bee = (Bee*)malloc(sizeof(Bee));
@@ -33,32 +32,32 @@ void create_a_bee(Bee* b) {
         fprintf(stderr, "Failed to create bee thread (errno=%d)\n", rc);
         free(b);
 
-        if (rc == EAGAIN) { // EAGAIN indicates resource exhaustion (errno=11)
+        if (rc == EAGAIN) { // EAGAIN indicates resource exhaustion
             consecutive_failures++;
-            if (consecutive_failures >= 3) { // Trigger stop after 3 consecutive failures
+            if (consecutive_failures >= 3) {
                 fprintf(stderr, "Repeated thread creation failures. Stopping program.\n");
-                stop = 1; // Set stop flag for graceful termination
-                cleanup(); // Call cleanup and terminate
-                exit(EXIT_FAILURE); // Ensure the program exits
+                stop = 1;
+                cleanup();
+                exit(EXIT_FAILURE);
             }
         }
-        return; // Allow the program to continue for other types of errors
+        return;
     }
 
-    consecutive_failures = 0; // Reset failure counter on successful creation
+    consecutive_failures = 0; // reset on success
 
     if (register_bee_thread(t) < 0) {
         fprintf(stderr, "Out of memory storing bee thread.\n");
         pthread_cancel(t);
         free(b);
-        stop = 1; // gracefully signal to stop
+        stop = 1;
         cleanup();
         exit(EXIT_FAILURE);
     }
 }
 
 
- int register_bee_thread(pthread_t thread) {
+int register_bee_thread(pthread_t thread) {
     pthread_mutex_lock(&bee_list_mutex);
 
     if (bee_thread_count == bee_thread_capacity) {
@@ -84,25 +83,29 @@ void* bee_life(void* arg) {
         return NULL;
     }
 
-    printf("\033[0;32mPszczoła %d startuje w wątku.\033[0m\n", bee->id);
+    printf("\033[0;32mPszczoła %d:  startuje w wątku.\033[0m\n", bee->id);
 
     while (bee->visits_left > 0 && !stop) {
-        // Attempt to enter hive
+        // Wejście do ula
         hive_entry(bee->id);
         hive_state();
-        // Simulate time in hive
+
+        // Czas w ulu
         sleep(bee->time_in_hive);
-        // Attempt to leave hive
+
+        // Wyjście z ula
         hive_leave(bee->id);
         hive_state();
+
         bee->visits_left--;
-        // Simulate outside hive time
+
+        // Poza ulem
         sleep(5);
     }
 
-    printf("\033[0;32mPszczoła %d kończy życie.\033[0m\n", bee->id);
+    printf("\033[0;32mPszczoła %d:  kończy życie.\033[0m\n", bee->id);
 
-    // Unlock direction semaphores as a fallback
+    // Odblokowanie semaforów kierunku na wszelki wypadek
     sem_post(&wejscie1_kierunek);
     sem_post(&wejscie2_kierunek);
 

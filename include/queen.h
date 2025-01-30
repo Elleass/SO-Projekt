@@ -5,19 +5,21 @@
 #include "bee.h"
 #include "hive.h"
 #include "error_handling.h"
-#include <signal.h>  // For sig_atomic_t
-#include <sys/wait.h>
+
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <signal.h>
-#include <sys/wait.h> // Dodano nagłówek
+#include <sys/wait.h>
 #include <semaphore.h>
+
+// Flaga sygnałowa do zatrzymania
 extern volatile sig_atomic_t stop;
+
+// Proces królowej (składanie jaj)
 void queen_process(EggQueue* eggQueue);
+
+// Proces wylęgania jaj
 void hatch_eggs(EggQueue* eggQueue);
 
-
-
-
-#endif
+#endif // QUEEN_H

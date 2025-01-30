@@ -7,16 +7,19 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Id-ki segmentu pamięci i semafora SysV
 int shm_id = -1;
 int sem_id = -1;
 
-// Error structure is from error_handling.
+// Wskaźnik globalny zdefiniowany w main.c
+// extern EggQueue *eggQueue;  // Już mamy w innym pliku
 
-
-
-/** Initialize occupant_count=0, egg queue empty, plus a SysV semaphore for concurrency. */
+/**
+ * Inicjalizacja segmentu pamięci wspólnej dla EggQueue (including occupant_count, capacity) 
+ * + semafor SysV do synchronizacji.
+ */
 Error initSharedEggQueue(EggQueue **queue) {
-    // Create SysV shared memory segment
+    // Tworzymy segment pamięci wspólnej
     shm_id = shmget(IPC_PRIVATE, sizeof(EggQueue), IPC_CREAT | 0666);
     if (shm_id == -1) {
         return (Error){ERR_MEMORY_ALLOC, "Failed to create shared memory"};
@@ -27,19 +30,19 @@ Error initSharedEggQueue(EggQueue **queue) {
         return (Error){ERR_MEMORY_ALLOC, "Failed to attach shared memory"};
     }
 
-    // Initialize fields
+    // Inicjalizacja pól w strukturze
     (*queue)->front = 0;
     (*queue)->rear = -1;
     (*queue)->size = 0;
     (*queue)->occupant_count = 0;
+    (*queue)->capacity = 0;     // domyślna 0, ustawiana potem w main
 
-    // Create a SysV semaphore for occupant_count + queue concurrency
-    // Store in the global 'sem_id'
+    // Tworzymy semafor SysV (1 sztuka) – do blokowania kolejki
     sem_id = semget(IPC_PRIVATE, 1, IPC_CREAT | 0666);
     if (sem_id == -1) {
         return (Error){ERR_MEMORY_ALLOC, "Failed to create SysV semaphore"};
     }
-    // Initialize the semaphore to 1 (binary lock)
+    // Ustawiamy jego wartość na 1 (binarna blokada)
     if (semctl(sem_id, 0, SETVAL, 1) == -1) {
         return (Error){ERR_MEMORY_ALLOC, "Failed to set SysV semaphore value"};
     }
@@ -47,36 +50,32 @@ Error initSharedEggQueue(EggQueue **queue) {
     return (Error){ERR_SUCCESS, "EggQueue initialized successfully"};
 }
 
+/**
+ * Usuwamy segment pamięci i semafor
+ */
 void destroySharedEggQueue() {
-    // Detach and remove the shared memory
+    // Odłączamy i usuwamy segment
     if (shm_id != -1) {
-        if (shmctl(shm_id, IPC_RMID, NULL) == -1) {
-            perror("Failed to remove shared memory");
-        }
+        shmctl(shm_id, IPC_RMID, NULL); 
     }
-    // Remove the semaphore for occupant_count + queue
+    // Usuwamy semafor SysV
     if (sem_id != -1) {
-        if (semctl(sem_id, 0, IPC_RMID) == -1) {
-            perror("Failed to remove occupant_count SysV semaphore");
-        }
+        semctl(sem_id, 0, IPC_RMID);
     }
 }
 
 /**
- * Enqueue an Egg => occupant_count++ as well, because
- * an Egg also occupies the hive.
- * We lock the queue, check if queue is full, do occupant_count++,
- * then push the egg.
+ * Wstawianie jajka do kolejki + occupant_count++
  */
 int enqueueEgg(EggQueue* q, Egg egg) {
     lock_queue();
 
     if (q->size == MAX_EGGS) {
         unlock_queue();
-        return -1; // queue is full
+        return -1; // kolejka pełna
     }
 
-    // occupant_count++ (the egg itself is occupying the hive)
+    // occupant_count++ (jajko też zajmuje miejsce)
     q->occupant_count++;
 
     q->rear = (q->rear + 1) % MAX_EGGS;
@@ -84,21 +83,20 @@ int enqueueEgg(EggQueue* q, Egg egg) {
     q->size++;
 
     unlock_queue();
-    return 0; // success
+    return 0; 
 }
 
 /**
- * Dequeue an Egg => occupant_count--, because that Egg no longer occupies the hive.
+ * Wyjmowanie jajka z kolejki + occupant_count--
  */
 int dequeueEgg(EggQueue* q, Egg* egg) {
     lock_queue();
 
     if (q->size == 0) {
         unlock_queue();
-        return -1; // no eggs
+        return -1; // brak jaj
     }
 
-    // occupant_count--
     if (q->occupant_count > 0) {
         q->occupant_count--;
     }
@@ -108,28 +106,35 @@ int dequeueEgg(EggQueue* q, Egg* egg) {
     q->size--;
 
     unlock_queue();
-    return 0; // success
+    return 0;
 }
 
-
+/**
+ * occupant_increment / occupant_decrement
+ * (dla pszczół – jeśli nie korzystają z enqueueEgg/dequeueEgg).
+ */
 void occupant_increment(void) {
-    // Increment occupant_count in the shared memory
+    lock_queue();
     eggQueue->occupant_count++;
+    unlock_queue();
 }
-
 void occupant_decrement(void) {
+    lock_queue();
     if (eggQueue->occupant_count > 0) {
         eggQueue->occupant_count--;
     }
+    unlock_queue();
 }
 
+/**
+ * Blokada kolejki – semafor SysV
+ */
 void lock_queue(void) {
     struct sembuf lock_op = {0, -1, 0};
     if (semop(sem_id, &lock_op, 1) == -1) {
         perror("lock_queue: semop failed");
     }
 }
-
 void unlock_queue(void) {
     struct sembuf unlock_op = {0, 1, 0};
     if (semop(sem_id, &unlock_op, 1) == -1) {

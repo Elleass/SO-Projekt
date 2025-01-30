@@ -1,117 +1,143 @@
 #include "hive.h"
 #include "error_handling.h"
 
+// Zakładamy, że w pliku nagłówkowym hive.h:
+//   - extern EggQueue *eggQueue;       // W pamięci współdzielonej
+//   - extern sem_t *ul_wejscie;
+//   - extern sem_t wejscie1_kierunek;
+//   - extern sem_t wejscie2_kierunek;
+//   - deklaracje occupant_increment(), occupant_decrement() i lock_queue(), unlock_queue() itd.
 
+/**
+ * Pszczoła próbuje wejść do ula, korzystając z jednego z wejść (wejscie1_kierunek / wejscie2_kierunek).
+ * Gdy uda się zarezerwować kierunek i semafor `ul_wejscie`, occupant_count++ i wchodzimy.
+ */
 void hive_entry(int id) {
     int success = 0;
 
     while (!success && !stop) {
-        // Try wejscie1_kierunek
+        // Próba wejścia 1
         if (sem_trywait(&wejscie1_kierunek) == 0) {
-            if (sem_trywait(ul_wejscie) == 0) { // Reserve space in the hive
-                occupant_increment(); // Update occupant count
-                printf("\033[0;34mPszczoła %d wchodzi do ula wejściem 1.\033[0m\n", id);
-                sem_post(&wejscie1_kierunek); // Release direction semaphore
+            // Rezerwujemy "miejsce w ulu"
+            if (sem_trywait(ul_wejscie) == 0) {
+                occupant_increment();
+                printf("\033[0;34mPszczoła %d:  wchodzi do ula wejściem 1.\033[0m\n", id);
+                sem_post(&wejscie1_kierunek);
                 success = 1;
             } else {
-                sem_post(&wejscie1_kierunek); // Release if ul_wejscie fails
-                printf("\033[0;34mPszczoła %d czeka - ul pełny\033[0m\n", id);
+                sem_post(&wejscie1_kierunek);
+                printf("\033[0;34mPszczoła %d:  czeka - ul pełny.\033[0m\n", id);
                 sleep(1);
             }
         }
-        // Try wejscie2_kierunek
+        // Próba wejścia 2
         else if (sem_trywait(&wejscie2_kierunek) == 0) {
-            if (sem_trywait(ul_wejscie) == 0) { // Reserve space in the hive
-                occupant_increment(); // Update occupant count
-                printf("\033[0;34mPszczoła %d wchodzi do ula wejściem 2.\033[0m\n", id);
-                sem_post(&wejscie2_kierunek); // Release direction semaphore
+            if (sem_trywait(ul_wejscie) == 0) {
+                occupant_increment();
+                printf("\033[0;34mPszczoła %d:  wchodzi do ula wejściem 2.\033[0m\n", id);
+                sem_post(&wejscie2_kierunek);
                 success = 1;
             } else {
-                sem_post(&wejscie2_kierunek); // Release if ul_wejscie fails
-                printf("\033[0;34mPszczoła %d czeka - ul pełny\033[0m\n", id);
+                sem_post(&wejscie2_kierunek);
+                printf("\033[0;34mPszczoła %d:  czeka - ul pełny.\033[0m\n", id);
                 sleep(1);
             }
-        } else {
-            printf("\033[0;33mPszczoła %d czeka, oba wejścia są zajęte.\033[0m\n", id);
+        }
+        else {
+            // Oba wejścia zajęte – poczekaj
+            printf("\033[0;33mPszczoła %d:  czeka, oba wejścia są zajęte.\033[0m\n", id);
             sleep(1);
         }
     }
 }
 
-
 /**
- * Attempt to leave the hive:
- * - occupant_count--,
- * - sem_post(ul_wejscie) to free up a slot,
- * - direction semaphores handle concurrency out the door
+ * Pszczoła opuszcza ul – occupant_count--, zwalniamy semafor ul_wejscie
  */
 void hive_leave(int id) {
     int success = 0;
 
     while (!success && !stop) {
-        // Try wejscie1_kierunek
         if (sem_trywait(&wejscie1_kierunek) == 0) {
-            occupant_decrement(); // Update occupant count
-            sem_post(ul_wejscie); // Free hive space
-            printf("\033[0;34mPszczoła %d wychodzi z ula wejściem 1.\033[0m\n", id);
-            sem_post(&wejscie1_kierunek); // Release direction semaphore
+            occupant_decrement();
+            sem_post(ul_wejscie);
+            printf("\033[0;34mPszczoła %d:  wychodzi z ula wejściem 1.\033[0m\n", id);
+            sem_post(&wejscie1_kierunek);
             success = 1;
         }
-        // Try wejscie2_kierunek
         else if (sem_trywait(&wejscie2_kierunek) == 0) {
-            occupant_decrement(); // Update occupant count
-            sem_post(ul_wejscie); // Free hive space
-            printf("\033[0;34mPszczoła %d wychodzi z ula wejściem 2.\033[0m\n", id);
-            sem_post(&wejscie2_kierunek); // Release direction semaphore
+            occupant_decrement();
+            sem_post(ul_wejscie);
+            printf("\033[0;34mPszczoła %d:  wychodzi z ula wejściem 2.\033[0m\n", id);
+            sem_post(&wejscie2_kierunek);
             success = 1;
-        } else {
-            printf("\033[0;33mPszczoła %d czeka, oba wejścia są zajęte.\033[0m\n", id);
+        }
+        else {
+            printf("\033[0;33mPszczoła %d:  czeka, oba wejścia są zajęte.\033[0m\n", id);
             sleep(1);
         }
     }
 }
 
-
 /**
- * Display the current state of the hive:
- * - occupant_count in eggQueue->occupant_count
- * - eggQueue->size (number of eggs)
- * - bees = occupant_count - eggQueue->size
- * - free_space = capacity - occupant_count
+ * Wyświetla stan ula: ile pszczół, ile jaj, ile wolnego miejsca.
+ * Zamiast globalnego `capacity`, używamy `eggQueue->capacity`.
  */
 void hive_state(void) {
     lock_queue();
-    int occupant = eggQueue->occupant_count;
-    int egg_count = eggQueue->size;
+    int occupant   = eggQueue->occupant_count; 
+    int egg_count  = eggQueue->size;
+    int cap        = eggQueue->capacity;
     unlock_queue();
 
     int bee_count = occupant - egg_count;
     if (bee_count < 0) bee_count = 0;
 
-    int free_space = capacity - occupant;
-    if (free_space < 0) free_space = 0; // should never go negative
+    int free_space = cap - occupant;
+    if (free_space < 0) {
+        free_space = 0; // na wszelki wypadek
+    }
 
-    if (free_space == 0 && occupant >= capacity) {
-        printf("\033[0;33mUl jest pełny.\033[0m | Bees: %d, Eggs: %d\n", bee_count, egg_count);
+    if (free_space == 0 && occupant >= cap) {
+        printf("\033[0;33mUl jest pełny.\033[0m | Bees: %d, Eggs: %d\n",
+               bee_count, egg_count);
     } else {
-        printf("\033[0;34mWolna przestrzeń w ulu: %d (zajęte: %d). Bees: %d, Eggs: %d\033[0m\n",
+        printf("\033[0;34mWolna przestrzeń: %d (\033[0mzajęte: %d). Bees: %d, Eggs: %d\n",
                free_space, occupant, bee_count, egg_count);
     }
 }
 
-/** Adjust the hive capacity (beekeeper signals) */
+/**
+ * Zmiana pojemności ula i dostosowanie semafora `ul_wejscie` do nowej wartości.
+ * Zamiast globalnego `capacity` – modyfikujemy `eggQueue->capacity`.
+ */
 void adjust_hive_capacity(int new_capacity) {
-    if (new_capacity < 1) {
-        printf("Minimalna pojemność ula to 1. Ustawiam %d na 1.\n", new_capacity);
-        new_capacity = 1;
+    lock_queue();
+    int old_capacity   = eggQueue->capacity;
+    eggQueue->capacity = new_capacity;
+    unlock_queue();
+
+    int diff = new_capacity - old_capacity;
+
+    if (diff > 0) {
+        // Zwiększamy semafor (dodajemy "wolne miejsca")
+        for (int i = 0; i < diff; i++) {
+            sem_post(ul_wejscie);
+        }
+        printf("\033[0;35mZwiększanie pojemności ula z %d do %d\033[0m\n",
+               old_capacity, new_capacity);
     }
-    // Just set the global capacity; occupant_count won't be touched here.
-    if (new_capacity > capacity) {
-        printf("\033[0;35mDodawanie ramek: zwiększanie pojemności ula do %d\033[0m\n", new_capacity);
-    } else if (new_capacity < capacity) {
-        printf("\033[0;35mUsuwanie ramek: zmniejszanie pojemności ula do %d\033[0m\n", new_capacity);
-    } else {
+    else if (diff < 0) {
+        // Zmniejszamy semafor (usuwamy "wolne miejsca")
+        diff = -diff;
+        for (int i = 0; i < diff; i++) {
+            sem_trywait(ul_wejscie);
+        }
+        printf("\033[0;35mZmniejszanie pojemności ula z %d do %d\033[0m\n",
+               old_capacity, new_capacity);
+    }
+    else {
+        // Bez zmian
         printf("Pojemność ula pozostaje taka sama: %d\n", new_capacity);
     }
-    capacity = new_capacity;
 }
