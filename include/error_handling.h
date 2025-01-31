@@ -1,3 +1,9 @@
+/*******************************************************
+ * error_handling.h
+ *
+ * Deklaracje podstawowych błędów i funkcji do obsługi.
+ *******************************************************/
+
 #ifndef ERROR_HANDLING_H
 #define ERROR_HANDLING_H
 

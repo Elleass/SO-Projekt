@@ -1,18 +1,32 @@
+/*******************************************************
+ * bee.c
+ *
+ * Implementacja funkcji związanych z pszczołami:
+ *  - Tworzenie obiektu Bee (createBee)
+ *  - Zakładanie wątku pszczoły (create_a_bee)
+ *  - Główna funkcja wątku pszczoły (bee_life)
+ *  - Rejestrowanie wątku pszczoły w tablicy globalnej
+ *******************************************************/
+
 #include "bee.h"
 #include "hive.h"
 #include "error_handling.h"
 #include "cleanup.h"
-#include "errno.h"
 
-// (przeniesione do main.c)
-// pthread_t *bee_threads = NULL;
-// int bee_thread_count = 0;
-// int bee_thread_capacity = 0;
-// pthread_mutex_t bee_list_mutex = PTHREAD_MUTEX_INITIALIZER;
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-Bee* createBee(int id, int time_in_hive, int visits_left) {
+/**
+ * createBee
+ *  - Alokuje pamięć dla nowej pszczoły i inicjuje jej pola.
+ */
+Bee* createBee(int id, int time_in_hive, int visits_left)
+{
     Bee* new_bee = (Bee*)malloc(sizeof(Bee));
-    if (!new_bee) {
+    if (!new_bee)
+    {
         handle_error((Error){ERR_MEMORY_ALLOC, "Failed to allocate memory for Bee"});
         return NULL;
     }
@@ -22,19 +36,27 @@ Bee* createBee(int id, int time_in_hive, int visits_left) {
     return new_bee;
 }
 
-
-void create_a_bee(Bee* b) {
+/**
+ * create_a_bee
+ *  - Tworzy wątek pszczoły (bee_life) i rejestruje go w tablicy globalnej wątków.
+ *  - Obsługuje ewentualne błędy (np. brak zasobów systemowych EAGAIN).
+ */
+void create_a_bee(Bee* b)
+{
     pthread_t t;
     int rc = pthread_create(&t, NULL, bee_life, b);
-    static int consecutive_failures = 0; // Track consecutive failures
+    static int consecutive_failures = 0; // śledzi kolejne niepowodzenia
 
-    if (rc != 0) {
+    if (rc != 0)
+    {
         fprintf(stderr, "Failed to create bee thread (errno=%d)\n", rc);
         free(b);
 
-        if (rc == EAGAIN) { // EAGAIN indicates resource exhaustion
+        if (rc == EAGAIN)  // EAGAIN = brak zasobów
+        {
             consecutive_failures++;
-            if (consecutive_failures >= 3) {
+            if (consecutive_failures >= 3)
+            {
                 fprintf(stderr, "Repeated thread creation failures. Stopping program.\n");
                 stop = 1;
                 cleanup();
@@ -44,9 +66,12 @@ void create_a_bee(Bee* b) {
         return;
     }
 
-    consecutive_failures = 0; // reset on success
+    // Jeśli się udało, zerujemy licznik niepowodzeń
+    consecutive_failures = 0;
 
-    if (register_bee_thread(t) < 0) {
+    // Rejestrujemy wątek w tablicy
+    if (register_bee_thread(t) < 0)
+    {
         fprintf(stderr, "Out of memory storing bee thread.\n");
         pthread_cancel(t);
         free(b);
@@ -56,14 +81,20 @@ void create_a_bee(Bee* b) {
     }
 }
 
-
-int register_bee_thread(pthread_t thread) {
+/**
+ * register_bee_thread
+ *  - Dodaje wątek do globalnej tablicy wątków (z dynamicznym powiększaniem).
+ */
+int register_bee_thread(pthread_t thread)
+{
     pthread_mutex_lock(&bee_list_mutex);
 
-    if (bee_thread_count == bee_thread_capacity) {
-        int new_cap = (bee_thread_capacity == 0) ? 16 : bee_thread_capacity * 2;
+    if (bee_thread_count == bee_thread_capacity)
+    {
+        int new_cap = (bee_thread_capacity == 0) ? 16 : (bee_thread_capacity * 2);
         pthread_t *tmp = realloc(bee_threads, new_cap * sizeof(pthread_t));
-        if (!tmp) {
+        if (!tmp)
+        {
             pthread_mutex_unlock(&bee_list_mutex);
             return -1;
         }
@@ -76,36 +107,41 @@ int register_bee_thread(pthread_t thread) {
     return 0;
 }
 
-void* bee_life(void* arg) {
+/**
+ * bee_life
+ *  - Główna funkcja wątku pszczoły.
+ *  - W pętli: wchodzi do ula -> przebywa w nim -> wychodzi -> czeka poza ulem -> zmniejsza visits_left.
+ */
+void* bee_life(void* arg)
+{
     Bee* bee = (Bee*)arg;
-    if (!bee) {
+    if (!bee)
+    {
         fprintf(stderr, "Invalid Bee pointer\n");
         return NULL;
     }
 
-    printf("\033[0;32mPszczoła %d:  startuje w wątku.\033[0m\n", bee->id);
+    printf("\033[0;32mPszczoła %d: startuje w wątku.\033[0m\n", bee->id);
 
-    while (bee->visits_left > 0 && !stop) {
-        // Wejście do ula
+    while (bee->visits_left > 0 && !stop)
+    {
         hive_entry(bee->id);
         hive_state();
 
-        // Czas w ulu
         sleep(bee->time_in_hive);
 
-        // Wyjście z ula
         hive_leave(bee->id);
         hive_state();
 
         bee->visits_left--;
 
-        // Poza ulem
+        // Poza ulem (symulacja)
         sleep(5);
     }
 
-    printf("\033[0;32mPszczoła %d:  kończy życie.\033[0m\n", bee->id);
+    printf("\033[0;32mPszczoła %d: kończy życie.\033[0m\n", bee->id);
 
-    // Odblokowanie semaforów kierunku na wszelki wypadek
+    // Na wszelki wypadek odblokowanie semaforów kierunku
     sem_post(&wejscie1_kierunek);
     sem_post(&wejscie2_kierunek);
 

@@ -1,53 +1,51 @@
+/*******************************************************
+ * egg.h
+ *
+ * Deklaracja struktur i funkcji dotyczących "jaj" (Egg).
+ * W tym: kolejka jaj (EggQueue) w pamięci współdzielonej.
+ *******************************************************/
+
 #ifndef EGG_H
 #define EGG_H
 
-#include <sys/ipc.h>
-#include <sys/shm.h>
-#include <sys/sem.h>
-#include <pthread.h>
-#include <unistd.h>
-#include "error_handling.h"  // dla typu Error
+#include "error_handling.h"
 
 #define MAX_EGGS 100
 
 // Struktura opisująca pojedyncze jajo
 typedef struct Egg {
     int id;
-    int hatch_time;
+    int hatch_time; // czas do wyklucia (w sekundach)
 } Egg;
 
 /**
  * Struktura kolejki jaj w pamięci współdzielonej:
  *  - eggs[]: tablica jaj
- *  - front, rear, size: wskaźniki/rozmiar kolejki cyklicznej
- *  - occupant_count: liczba zajętych miejsc (jaj + pszczół) w ulu
- *  - capacity: aktualna pojemność ula
+ *  - front, rear, size: pomocnicze do kolejki cyklicznej
+ *  - occupant_count: liczba zajętych miejsc (jaj + pszczół)
+ *  - capacity: maksymalna pojemność ula
  */
 typedef struct EggQueue {
     Egg eggs[MAX_EGGS];
     int front;
     int rear;
     int size;
-    int occupant_count;
-    int capacity;  // <--- PRZENIESIONE TU ZAMIAST GLOBALNEJ ZMIENNEJ
+
+    int occupant_count; // ilu aktualnie jest "rezydentów" (pszczoły+jaja)
+    int capacity;       // pojemność ula
 } EggQueue;
 
-// Wskaźnik do kolejki (w pamięci współdzielonej)
 extern EggQueue *eggQueue;
 
-// Zarządzanie pamięcią współdzieloną (tworzenie, usuwanie)
 Error initSharedEggQueue(EggQueue** queue);
-void destroySharedEggQueue();
+void destroySharedEggQueue(void);
 
-// Operacje na kolejce
 int enqueueEgg(EggQueue* queue, Egg egg);
 int dequeueEgg(EggQueue* queue, Egg* egg);
 
-// Zwiększanie/zmniejszanie occupant_count (np. przez pszczoły)
 void occupant_increment(void);
 void occupant_decrement(void);
 
-// Blokada kolejki (semafor SysV)
 void lock_queue(void);
 void unlock_queue(void);
 
