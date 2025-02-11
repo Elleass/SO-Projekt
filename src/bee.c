@@ -142,8 +142,8 @@ void* bee_life(void* arg)
     printf("\033[0;32mPszczoła %d: kończy życie.\033[0m\n", bee->id);
 
     // Na wszelki wypadek odblokowanie semaforów kierunku
-    sem_post(&wejscie1_kierunek);
-    sem_post(&wejscie2_kierunek);
+    // sem_post(&wejscie1_kierunek);
+    // sem_post(&wejscie2_kierunek);
 
     free(bee);
     return NULL;

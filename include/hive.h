@@ -16,8 +16,8 @@
 
 // Zewnętrzne semafory (zdefiniowane w main.c)
 extern sem_t *ul_wejscie;          // ogranicza liczbę osobników w ulu
-extern sem_t wejscie1_kierunek;    // semafor kierunku 1
-extern sem_t wejscie2_kierunek;    // semafor kierunku 2
+extern sem_t *wejscie1_kierunek_ptr;
+extern sem_t *wejscie2_kierunek_ptr;
 
 // Flaga zatrzymania (z main.c)
 extern volatile sig_atomic_t stop;

@@ -46,8 +46,8 @@ pthread_mutex_t bee_list_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Semafory globalne (dla ula)
 sem_t *ul_wejscie = NULL;       // ogranicza liczbę osobników w ulu
-sem_t wejscie1_kierunek;        // kontrola kierunku wejścia 1
-sem_t wejscie2_kierunek;        // kontrola kierunku wejścia 2
+sem_t *wejscie1_kierunek_ptr;
+sem_t *wejscie2_kierunek_ptr;
 
 // Flaga stopu (dla wszystkich procesów i wątków)
 volatile sig_atomic_t stop = 0;
@@ -139,8 +139,19 @@ int main(void)
     }
 
     //Inicjalizacja semaforów wejściowych (kierunków)
-    sem_init(&wejscie1_kierunek, 0, 1);
-    sem_init(&wejscie2_kierunek, 0, 1);
+    wejscie1_kierunek_ptr = mmap(NULL, sizeof(sem_t),
+    PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+wejscie2_kierunek_ptr = mmap(NULL, sizeof(sem_t),
+    PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+if (wejscie1_kierunek_ptr == MAP_FAILED || wejscie2_kierunek_ptr == MAP_FAILED) {
+    perror("mmap for wejscie pointers");
+    exit(1);
+}
+
+sem_init(wejscie1_kierunek_ptr, 1, 1); // pshared=1
+sem_init(wejscie2_kierunek_ptr, 1, 1); // pshared=1
 
     //Tworzenie wątków startowych pszczół
     for (int i = 0; i < num_starter_bees; i++)

@@ -91,6 +91,9 @@ void hatch_eggs(EggQueue* eggQueue)
         {
             // Wyklute jajo -> pszczoła
             printf("\033[0;32mWykluwanie: Jajko ID: %d wykluło się w pszczołę!\033[0m\n", hatched_egg.id);
+            printf("[DEBUG] occupant_count=%d, egg_count=%d => bee_count=%d\n",
+                eggQueue->occupant_count, eggQueue->size,
+                eggQueue->occupant_count - eggQueue->size);
 
             Bee* new_bee = createBee(hatched_egg.id, 4, 1);
             if (!new_bee)

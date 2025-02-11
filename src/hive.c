@@ -15,6 +15,30 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+
+
+#define DEBUG_SEM 1  // set to 1 to enable
+
+int my_sem_trywait(sem_t* s, const char* semname, int bee_id) {
+    int rv = sem_trywait(s);
+#if DEBUG_SEM
+    if (rv == 0) {
+        printf("[DEBUG] Bee %d acquired %s\n", bee_id, semname);
+    } else {
+        // typically EAGAIN if zero
+    }
+#endif
+    return rv;
+}
+
+void my_sem_post(sem_t* s, const char* semname, int bee_id) {
+    sem_post(s);
+#if DEBUG_SEM
+    printf("[DEBUG] Bee %d posted %s\n", bee_id, semname);
+#endif
+}
+
+
 /**
  * hive_entry
  *  - Pszczoła próbuje wejść do ula.
@@ -28,34 +52,34 @@ void hive_entry(int id)
     while (!success && !stop)
     {
         // Próba wejścia 1
-        if (sem_trywait(&wejscie1_kierunek) == 0)
+        if (my_sem_trywait(wejscie1_kierunek_ptr, "wejscie1_kierunek", id) == 0)
         {
             if (sem_trywait(ul_wejscie) == 0)
             {
                 occupant_increment();  
                 printf("\033[0;34mPszczoła %d: wchodzi do ula wejściem 1.\033[0m\n", id);
-                sem_post(&wejscie1_kierunek);
+                my_sem_post(wejscie1_kierunek_ptr, "wejscie1_kierunek", id);
                 success = 1;
             }
             else
             {
-                sem_post(&wejscie1_kierunek);
+                my_sem_post(wejscie1_kierunek_ptr, "wejscie1_kierunek", id);
                 printf("\033[0;34mPszczoła %d: czeka - ul pełny.\033[0m\n", id);
                 sleep(1);
             }
         }
-        else if (sem_trywait(&wejscie2_kierunek) == 0)
+        else if (my_sem_trywait(wejscie2_kierunek_ptr, "wejscie2_kierunek", id) == 0)
         {
             if (sem_trywait(ul_wejscie) == 0)
             {
                 occupant_increment();
                 printf("\033[0;34mPszczoła %d: wchodzi do ula wejściem 2.\033[0m\n", id);
-                sem_post(&wejscie2_kierunek);
+                my_sem_post(wejscie2_kierunek_ptr, "wejscie2_kierunek", id);
                 success = 1;
             }
             else
             {
-                sem_post(&wejscie2_kierunek);
+                my_sem_post(wejscie2_kierunek_ptr, "wejscie2_kierunek", id);
                 printf("\033[0;34mPszczoła %d: czeka - ul pełny.\033[0m\n", id);
                 sleep(1);
             }
@@ -79,20 +103,20 @@ void hive_leave(int id)
 
     while (!success && !stop)
     {
-        if (sem_trywait(&wejscie1_kierunek) == 0)
+        if (my_sem_trywait(wejscie1_kierunek_ptr, "wejscie1_kierunek", id) == 0)
         {
             occupant_decrement();
             sem_post(ul_wejscie);
             printf("\033[0;34mPszczoła %d: wychodzi z ula wejściem 1.\033[0m\n", id);
-            sem_post(&wejscie1_kierunek);
+            my_sem_post(wejscie1_kierunek_ptr, "wejscie1_kierunek", id);
             success = 1;
         }
-        else if (sem_trywait(&wejscie2_kierunek) == 0)
+        else if (my_sem_trywait(wejscie2_kierunek_ptr, "wejscie2_kierunek", id) == 0)
         {
             occupant_decrement();
             sem_post(ul_wejscie);
             printf("\033[0;34mPszczoła %d: wychodzi z ula wejściem 2.\033[0m\n", id);
-            sem_post(&wejscie2_kierunek);
+            my_sem_post(wejscie2_kierunek_ptr, "wejscie2_kierunek", id);
             success = 1;
         }
         else

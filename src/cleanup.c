@@ -82,14 +82,27 @@ void cleanup(void)
 
     //Usunięcie semaforów
     printf("Destroying semaphores...\n");
-    sem_destroy(&wejscie1_kierunek);
-    sem_destroy(&wejscie2_kierunek);
 
     if (ul_wejscie != MAP_FAILED)
     {
         sem_destroy(ul_wejscie);
         munmap(ul_wejscie, sizeof(sem_t));
     }
+
+    if (wejscie1_kierunek_ptr != MAP_FAILED)
+{
+    sem_destroy(wejscie1_kierunek_ptr);
+    munmap(wejscie1_kierunek_ptr, sizeof(sem_t));
+    wejscie1_kierunek_ptr = MAP_FAILED;
+}
+
+// wejscie2_kierunek_ptr
+if (wejscie2_kierunek_ptr != MAP_FAILED)
+{
+    sem_destroy(wejscie2_kierunek_ptr);
+    munmap(wejscie2_kierunek_ptr, sizeof(sem_t));
+    wejscie2_kierunek_ptr = MAP_FAILED;
+}
     printf("Semaphores destroyed.\n");
 
     //Zwolnienie pamięci współdzielonej dla EggQueue
