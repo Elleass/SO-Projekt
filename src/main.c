@@ -112,7 +112,8 @@ int main(void)
     printf("Maksymalna liczba pszczół w ulu: %d\n", P);
 
     int num_starter_bees = N;
-
+    pid_t pid = getpid(); 
+    printf("Current Process ID: %d\n", pid);
     Error err = initSharedEggQueue(&eggQueue);
     if (err.code != ERR_SUCCESS)
     {

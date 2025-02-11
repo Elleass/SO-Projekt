@@ -398,7 +398,19 @@ Pszczoły z krótkim życiem nie powracają do ula drugi raz.
 Królowa i proces wylęgania nadal mogą generować nowe pszczoły (z nowymi ID).
 Napotkany problem: Kolejność pojawiania się logów nie jest precyzyjna przez co zachowanie programu może stawać się nie czytelne. Zanim krolowa zlozy pierwsze jajo pszczoly umieraja przez co krolowa tworzy pszczole z ID martwej pszczoly.
 
-## 6. Podsumowanie
+
+## 6. Napotkane błędy i ich rozwiąznie
+Problem: Nowo wyklute pszczoły nie mogą wejść do ula z powodu fałszywego odczytu dostępności wejść.
+
+Przyczyna: Semafory lokalne (z pshared=0) nie były faktycznie współdzielone między procesem głównym a procesami potomnymi, więc nowo wyklute pszczoły (działające w innym procesie) nie widziały aktualnego stanu semaforów.
+
+Rozwiązanie: Przeniesienie semaforów do pamięci współdzielonej i inicjalizacji z pshared=1 powoduje, że wszyscy uczestnicy (proces główny, procesy queen/hatch) operują na tych samych strukturach semaforów i widzą ich prawidłowe wartości.
+
+https://github.com/Elleass/SO-Projekt/blob/54bb9364f6eb03b2179726c68cd89e8c1dce6b84/src/main.c#L141C4-L155C1
+
+## 7. Podsumowanie
+
+
 
 - Projekt pozwala na sprawdzenie mechanizmów synchronizacji i komunikacji międzyprocesowej (pamięć współdzielona, semafory, sygnały).
 - Udało się zrealizować wszystkie główne założenia: proces królowej i wylęgania, wątki pszczół, wątek pszczelarza reagujący na sygnały.
