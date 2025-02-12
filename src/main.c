@@ -157,7 +157,7 @@ sem_init(wejscie2_kierunek_ptr, 1, 1); // pshared=1
     //Tworzenie wątków startowych pszczół
     for (int i = 0; i < num_starter_bees; i++)
     {
-        Bee *b = createBee(next_bee_id++, 4, 1); // np. time_in_hive=4, visits_left=1
+        Bee *b = createBee(next_bee_id++, 4, 2); // np. time_in_hive=4, visits_left=1
         if (!b)
         {
             fprintf(stderr, "Error: Bee creation failed for index %d.\n", i);

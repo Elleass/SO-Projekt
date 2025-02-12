@@ -167,34 +167,47 @@ void hive_state(void)
  */
 void adjust_hive_capacity(int new_capacity)
 {
-    lock_queue();
-    int old_capacity   = eggQueue->capacity;
+    lock_queue(); 
+    int old_capacity = eggQueue->capacity;
     eggQueue->capacity = new_capacity;
     unlock_queue();
 
     int diff = new_capacity - old_capacity;
 
-    if (diff > 0)
+    if (diff == 0)
     {
+        printf("\033[35mPojemność ula pozostaje taka sama: %d \033[0m\n", new_capacity);
+        return;
+    }
+    else if (diff > 0)
+    {
+        // Zwiększanie pojemności
         for (int i = 0; i < diff; i++)
         {
             sem_post(ul_wejscie);
         }
-        printf("\033[0;35mZwiększanie pojemności ula z %d do %d\033[0m\n",
-               old_capacity, new_capacity);
+        printf("\033[35mZwiększanie pojemności ula z %d do %d\033[0m\n", old_capacity, new_capacity);
     }
-    else if (diff < 0)
+    else 
     {
-        diff = -diff;
-        for (int i = 0; i < diff; i++)
+        //zmniejszanie pojemności
+        int tokens_to_remove = -diff;
+        printf("\033[35mZmniejszanie pojemności ula z %d do %d\033[0m\n", old_capacity, new_capacity);
+
+        while (tokens_to_remove > 0)
         {
-            sem_trywait(ul_wejscie);
+            int rv = sem_trywait(ul_wejscie);
+            if (rv == 0)
+            {
+                tokens_to_remove--;
+            }
+            else
+            {
+                //ul jest pełny więc trzeba poczekać aż chociaż jedna z pszczół opuści ul aby zmienić jego wielkość.
+
+                usleep(1000);
+            }
         }
-        printf("\033[0;35mZmniejszanie pojemności ula z %d do %d\033[0m\n",
-               old_capacity, new_capacity);
-    }
-    else
-    {
-        printf("Pojemność ula pozostaje taka sama: %d\n", new_capacity);
     }
 }
+
