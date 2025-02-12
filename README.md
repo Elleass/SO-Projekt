@@ -279,7 +279,38 @@ Pszczoła 80: czeka - ul pełny.
 ```
 Wniosek: Pszczoły znajdujące się w ulu w trakcie wywołania jego zmniejszenia nie są z niego wyrzucane, jednak nowe pszczoły nie są dopuszczane do wejścia. Po opuszczeniu ula przez nadmiarowe pszczoły ul funkcjonuje już poprawnie. 
 
-### 4. Test krótkiej żywotności pszczół
+
+### 4. Test długiego czasu działania programu
+Cel: Sprawdzenie czy po długim czasie działania programu symulacja wciąż będzie działać:
+Przykładowe parametry wejściowe:
+N = 1000
+P = 499
+
+```
+Wolna przestrzeń: 498 (zajęte: 1). Bees: 0, Eggs: 1
+Pszczoła 1085: kończy życie.
+Wykluwanie: Jajko ID: 1087 wykluło się w pszczołę!
+[DEBUG] occupant_count=0, egg_count=0 => bee_count=0
+Pszczoła 1087: startuje w wątku.
+[DEBUG] Bee 1087 acquired wejscie1_kierunek
+Pszczoła 1087: wchodzi do ula wejściem 1.
+[DEBUG] Bee 1087 posted wejscie1_kierunek
+Wolna przestrzeń: 498 (zajęte: 1). Bees: 1, Eggs: 0
+Królowa: Złożono jajo ID: 1088 (wykluje się za 5 s)
+[DEBUG] Bee 1087 acquired wejscie1_kierunek
+Pszczoła 1087: wychodzi z ula wejściem 1.
+[DEBUG] Bee 1087 posted wejscie1_kierunek
+Wolna przestrzeń: 499 (zajęte: 0). Bees: 0, Eggs: 0
+Wykluwanie: Jajko ID: 1088 wykluło się w pszczołę!
+[DEBUG] occupant_count=0, egg_count=0 => bee_count=0
+Pszczoła 1088: startuje w wątku.
+[DEBUG] Bee 1088 acquired wejscie1_kierunek
+Pszczoła 1088: wchodzi do ula wejściem 1.
+```
+Wniosek: Po godzinie działania program wciąż funkcjonuje bez zarzutu. 
+
+Problem: Brak możliwości dostosowania liczby jaj składanych przez królową co powoduje powolne powstawanie nowych pszczół
+### 5. Test krótkiej żywotności pszczół
 
 pszczoła ginie po pierwszym wyjściu z ula. Cel:  sprawdzenie , czy occupant_count jest poprawnie dekrementowany i czy wątki „umierają” właściwie.
 
