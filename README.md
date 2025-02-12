@@ -157,52 +157,7 @@ https://github.com/Elleass/SO-Projekt/blob/1df356fa0ab6aa656ef2e6ecd1eddb7ce0083
 
 ## Testy:
 
-### 1. Test podstawowy
-
-Cel: Sprawdzenie, czy program uruchamia się poprawnie dla przykładowych danych wejściowych i wykonuje podstawowe zadania
-Przykładowe parametry wejściowe:
--N=6 (łącznie pszczół “robotnic”)
--P=2(początkowa maksymalna pojemność ula, P<N/2P<N/2)
-
-```
- Podaj całkowitą liczbę pszczół w roju (N) :  6
- Podaj maksymalną liczbę pszczół w ulu (P), gdzie P < N/2: 2
- Maksymalna liczba pszczół w ulu: 2
- inside queen_process (child PID: 125373)
- utworzono hatch_eggs (child PID: 125374)
- [Beekeeper] Oczekiwanie na sygnały:
-   - SIGUSR1 (kill -USR1 125356) => powiększ ul do min(2*N, capacity*2)
-   - SIGUSR2 (kill -USR2 125356) => zmniejsz ul do capacity/2
- Pszczoła 0 startuje w wątku.
- Pszczoła 0:  wchodzi do ula wejściem 1.
- Wolna przestrzeń: 1 (zajęte: 1). Bees: 1, Eggs: 0
- Pszczoła 1 startuje w wątku.
- Pszczoła 1:  wchodzi do ula wejściem 1.
- Ul jest pełny. | Bees: 2, Eggs: 0
- Pszczoła 2 startuje w wątku.
- Pszczoła 2:  czeka - ul pełny.
- szczoła 3:  czeka - ul pełny.
- Pszczoła 4:  czeka - ul pełny.
- Pszczoła 0:  wychodzi z ula wejściem 1.
- Wolna przestrzeń: 1 (zajęte: 1). Bees: 1, Eggs: 0
- Pszczoła 2:  wchodzi do ula wejściem 1.
- Ul jest pełny. | Bees: 2, Eggs: 0
- Pszczoła 3:  czeka - ul pełny.
- Pszczoła 5:  czeka - ul pełny.
- Pszczoła 1:  wychodzi z ula wejściem 1.
- Wolna przestrzeń: 1 (zajęte: 1). Bees: 1, Eggs: 0
- Pszczoła 4:  wchodzi do ula wejściem 1.
- Ul jest pełny. | Bees: 2, Eggs: 0
- Pszczoła 3:  czeka - ul pełny.
- Pszczoła 5:  czeka - ul pełny.
- Krolowa: Ul jest pelny, nie mozna zlozyc jaj.
- Pszczoła 3:  czeka - ul pełny.
-
-```
-
-Zgodnie z założeniem pszczoły czekają aż miejsce w ulu się zwolni, królowa w przypadku pełnego ula nie może złożyć jaj.
-
-### 2. Test wysokich wartości (ponad maksymalną wartość wątków)
+### 1. Test wysokich wartości (ponad maksymalną wartość wątków)
 
 Cel: Sprawdzenie czy w przypadku przekroczenia limitu dopuszczalnych wątków program wyłączy się w sposób przewidywalny.
 
@@ -247,109 +202,84 @@ Cleanup completed. Exiting.
 
 Po trzykrotnym wywołaniu się: Failed to create bee thread (errno=11) program wciąż tworzy zakolejkowane pszczoły które od razu umierają, dzieje się tak ponieważ program wpierw musi zamknąć procesy queen oraz hatch które mogły by tworzyć nowe pszczoły, następnie wykonuje się ciąg dalszy funkcji cleanup co pozwala zamknąć program w pełni kontrolowany sposób.
 
-### Test obsługi sygnałów SIGUSR1(zwiększenie pojemności) , SIGUSR2(zmniejszenie pojemności)
 
-Parametry początkowe: N=10,P=4.
-Cel: Sprawdzić, czy po wysłaniu sygnału SIGUSR1 do procesu głównego zwiększa się capacity, co umożliwia wejście większej liczbie pszczół oraz analogicznie po wysłaniu SIGUSR2 do procesu głównego zmniejsz się capacity o 50%.
+### 2. Test prawie maksymalnej wartości (czy program usuwa martwe pszczoły) [Zaaktualizowane]
 
-```
-Ul jest pełny. | Bees: 4, Eggs: 0
-Pszczoła 2:  czeka - ul pełny.
-Pszczoła 3:  czeka - ul pełny.
-Zwiększanie pojemności ula z 4 do 8
-Pszczoła 0:  wchodzi do ula wejściem 1.
-Wolna przestrzeń: 3 (zajęte: 5). Bees: 5, Eggs: 0
-Pszczoła 3:  wchodzi do ula wejściem 1.
-Wolna przestrzeń: 2 (zajęte: 6). Bees: 6, Eggs: 0
-Pszczoła 2:  wchodzi do ula wejściem 1.
-Wolna przestrzeń: 1 (zajęte: 7). Bees: 7, Eggs: 0
-Pszczoła 8:  wychodzi z ula wejściem 1.
-Wolna przestrzeń: 2 (zajęte: 6). Bees: 6, Eggs: 0
-Pszczoła 9:  wychodzi z ula wejściem 1.
-Wolna przestrzeń: 3 (zajęte: 5). Bees: 5, Eggs: 0
-Pszczoła 6:  wychodzi z ula wejściem 1.
-Wolna przestrzeń: 4 (zajęte: 4). Bees: 4, Eggs: 0
-Pszczoła 0 kończy życie.
-Pszczoła 7:  wchodzi do ula wejściem 1.
-Wolna przestrzeń: 3 (zajęte: 5). Bees: 5, Eggs: 0
-Pszczoła 5 kończy życie.
-Pszczoła 1:  wchodzi do ula wejściem 1.
-Wolna przestrzeń: 2 (zajęte: 6). Bees: 6, Eggs: 0
-Krolowa: Zlozono jajo ID: 4 (wykluje sie za 5 s)
-Pszczoła 2:  wychodzi z ula wejściem 1.
-Wolna przestrzeń: 2 (zajęte: 6). Bees: 5, Eggs: 1
+Cel: Sprawdzenie, czy martwe pszczoły wciąż zajmują miejsce wątków i czy program osiągnie maksymalną wartość wątków z powodu nowych pszczół.
+Przykładowe parametry wejściowe:
+-N=4750(łącznie pszczół “robotnic”)
+-P=2000początkowa maksymalna pojemność ula, P<N/2P<N/2>
 
 ```
-
-Po wysłaniu komendy kill -USR1 <PID> w innym terminalu ul powiększył się dwukrotnie i od razu wypełnił się czekającymi pszczołami.
-
+Pszczoła 4826: startuje w wątku.
+[DEBUG] Bee 4826 acquired wejscie1_kierunek
+Pszczoła 4826: wchodzi do ula wejściem 1.
+[DEBUG] Bee 4826 posted wejscie1_kierunek
+Wolna przestrzeń: 2199 (zajęte: 1). Bees: 1, Eggs: 0
+Królowa: Złożono jajo ID: 4827 (wykluje się za 5 s)
+Pszczoła 4825: kończy życie.
+[DEBUG] Bee 4826 acquired wejscie1_kierunek
+Pszczoła 4826: wychodzi z ula wejściem 1.
+[DEBUG] Bee 4826 posted wejscie1_kierunek
+Wolna przestrzeń: 2199 (zajęte: 1). Bees: 0, Eggs: 1
+Wykluwanie: Jajko ID: 4827 wykluło się w pszczołę!
+[DEBUG] occupant_count=0, egg_count=0 => bee_count=0
+Pszczoła 4827: startuje w wątku.
+[DEBUG] Bee 4827 acquired wejscie1_kierunek
+Pszczoła 4827: wchodzi do ula wejściem 1.
+[DEBUG] Bee 4827 posted wejscie1_kierunek
+Wolna przestrzeń: 2199 (zajęte: 1). Bees: 1, Eggs: 0
+Królowa: Złożono jajo ID: 4828 (wykluje się za 5 s)
 ```
-Zmniejszanie pojemności ula z 8 do 4
-Pszczoła 2:  wychodzi z ula wejściem 1.
-Ul jest pełny. | Bees: 5, Eggs: 0
-Krolowa: Zlozono jajo ID: 8 (wykluje sie za 5 s)
-Krolowa: Ul jest pelny, nie mozna zlozyc jaj.
-Pszczoła 4:  wychodzi z ula wejściem 1.
-Ul jest pełny. | Bees: 4, Eggs: 1
-Pszczoła 6:  wychodzi z ula wejściem 1.
-Ul jest pełny. | Bees: 3, Eggs: 1
-Wykluwanie: Jajko ID: 8 wyklulo sie w pszczole!
-Pszczoła 8 startuje w wątku.
-Pszczoła 8:  wchodzi do ula wejściem 1.
-Ul jest pełny. | Bees: 4, Eggs: 0
-Krolowa: Ul jest pelny, nie mozna zlozyc jaj.
-Pszczoła 2:  wchodzi do ula wejściem 1.
-Ul jest pełny. | Bees: 5, Eggs: 0
-Pszczoła 5:  wychodzi z ula wejściem 1.
-Ul jest pełny. | Bees: 4, Eggs: 0
-Pszczoła 3:  wychodzi z ula wejściem 1.
-Wolna przestrzeń: 1 (zajęte: 3). Bees: 3, Eggs: 0
-Pszczoła 4:  wchodzi do ula wejściem 1.
-Ul jest pełny. | Bees: 4, Eggs: 0
-Pszczoła 7:  wychodzi z ula wejściem 1.
-...
-Pszczoła 10:  wchodzi do ula wejściem 1.
-Wolna przestrzeń: 1 (zajęte: 3). Bees: 3, Eggs: 0
-Pszczoła 8:  wychodzi z ula wejściem 1.
-Wolna przestrzeń: 2 (zajęte: 2). Bees: 2, Eggs: 0
-Pszczoła 9:  wchodzi do ula wejściem 1.
-Wolna przestrzeń: 1 (zajęte: 3). Bees: 3, Eggs: 0
-Pszczoła 7:  wchodzi do ula wejściem 1.
-Ul jest pełny. | Bees: 4, Eggs: 0
+Wniosek: ID pszczoły wykroczyło po za limit z poprzedniego testu co pokazuję, że pszczoła po śmierci zwalnia swoje miejsce pozwalają progamowi działać w nieskończoność
 
+### 3. Test drastycznej zmiany pojemności ula [Zaaktualizowane]
+
+Cel: sprawdzenie zachowania ula w przypadku zmniejszenia jego pojemności do minimalnej wartości
+Przykładowe parametry wejsciowe:
+N = 100 
+P = 49
 ```
-
-Po wysłaniu komendy kill -USR2 <PID> w innym terminalu ul zmniejszył się dwukrotnie jednak od razu nie "wyrzucił" pszczół z ula oraz wpuścił ponad limit pszczoły czekające w kolejce przed wysłaniem komunikatu.
-Napotkany problem:
-Program nie wyrzuca pszczół które już znajdowały się w ulu przed zmniejszeniem pojemności, ani nie blokuje tych, które były w trakcie wejścia. W efekcie przez jakiś czas może być w ulu więcej pszczół niż nowa, zredukowana wartość miejsc.
-
-### Test zamykania programu Ctrl + C
-
+Pszczoła 20: czeka - ul pełny.
+Zmniejszanie pojemności ula z 6 do 3
+Zmniejszanie pojemności ula z 3 do 1
+[DEBUG] Bee 11 acquired wejscie1_kier
+.
+.
+.
+Pszczoła 51: czeka, oba wejścia są zajęte.
+Pszczoła 69: wychodzi z ula wejściem 1.
+[DEBUG] Bee 69 posted wejscie1_kierunek
+Ul jest pełny. | Bees: 14, Eggs: 0
+[DEBUG] Bee 68 acquired wejscie2_kierunek
+[DEBUG] Bee 68 posted wejscie2_kierunek
+Pszczoła 68: czeka - ul pełny.
+[DEBUG] Bee 81 acquired wejscie1_kierunek
+[DEBUG] Bee 81 posted wejscie1_kierunek
+Pszczoła 81: czeka - ul pełny.
+[DEBUG] Bee 26 acquired wejscie1_kierunek
+Pszczoła 26: wychodzi z ula wejściem 1.
+[DEBUG] Bee 26 posted wejscie1_kierunek
+Ul jest pełny. | Bees: 13, Eggs: 0
+[DEBUG] Bee 91 acquired wejscie1_kierunek
+.
+.
+.
+Pszczoła 83: wychodzi z ula wejściem 1.
+[DEBUG] Bee 83 posted wejscie1_kierunek
+Wolna przestrzeń: 1 (zajęte: 0). Bees: 0, Eggs: 0
+[DEBUG] Bee 95 acquired wejscie1_kierunek
+Pszczoła 95: wchodzi do ula wejściem 1.
+[DEBUG] Bee 95 posted wejscie1_kierunek
+Ul jest pełny. | Bees: 1, Eggs: 0
+Pszczoła 97: czeka, oba wejścia są zajęte.
+[DEBUG] Bee 80 acquired wejscie2_kierunek
+[DEBUG] Bee 80 posted wejscie2_kierunek
+Pszczoła 80: czeka - ul pełny.
 ```
-Krolowa: Ul jest pelny, nie mozna zlozyc jaj.
-Krolowa: Ul jest pelny, nie mozna zlozyc jaj.
-^C
-SIGINT received. Stopping...
-Starting cleanup...
-Terminating queen process (PID: 138998)...
-Queen process terminated.
-Terminating hatch process (PID: 138999)...
-Hatch process terminated.
-Canceling beekeeper thread...
-Beekeeper thread terminated.
-Canceling 10 bee threads...
-Bee threads cleaned up.
-Destroying semaphores...
-Semaphores destroyed.
-Destroying egg queue...
-Egg queue destroyed.
-Cleanup completed. Exiting.
+Wniosek: Pszczoły znajdujące się w ulu w trakcie wywołania jego zmniejszenia nie są z niego wyrzucane, jednak nowe pszczoły nie są dopuszczane do wejścia. Po opuszczeniu ula przez nadmiarowe pszczoły ul funkcjonuje już poprawnie. 
 
-```
-
-Po wysłaniu sygnału SIGINT program zamyka wszystkie procesy, czyści utworzone wątki oraz kolejke.
-
-### Test krótkiej żywotności pszczół
+### 4. Test krótkiej żywotności pszczół
 
 pszczoła ginie po pierwszym wyjściu z ula. Cel:  sprawdzenie , czy occupant_count jest poprawnie dekrementowany i czy wątki „umierają” właściwie.
 
